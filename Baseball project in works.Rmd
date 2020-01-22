@@ -1,0 +1,256 @@
+---
+title: "Baseball project"
+author: "Garrett Ariana"
+date: "12/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+```
+
+
+```{r}
+# Data selection/cleaning
+
+teams10to19 <- read.csv("thru2019payroll.csv", header = T, na.strings = "")
+payroll <- teams10to19
+head(payroll)
+payroll <- payroll[,c(1:8, 10:11)]
+payroll[, 'teamID'] <- as.factor(payroll[, 'teamID'])
+
+# Inflation
+inflation = c(1, 1.03, 1.05, 1.07, 1.09, 1.09, 1.10, 1.12, 1.15, 1.18)
+
+inflation.df <- data.frame(year=2010:2019, inflation)
+
+infl.lm <- lm(inflation ~ year, data=inflation.df)
+coefs <- coef(infl.lm)
+payroll <- payroll %>%
+  mutate(payrollStd = payroll / (coefs[1] + coefs[2] * yearID))
+
+```
+
+```{r}
+# World Series Winners
+Cols <- ifelse(payroll$WSWin=='1', "red", gray(.7, alpha=0.5))
+with(payroll, {
+  plot(payrollStd ~ jitter(yearID, 0.5), 
+       ylab = "Payroll (inflation-adjusted $ millions)",
+       ylim = c(15,250), log = "y",
+       xlab = "Year",
+       pch = 19, cex = 0.8, col = Cols)
+})
+with(payroll[payroll$WSWin == '1',],
+     text(y = payrollStd, x = yearID, labels = teamID, pos = 3, cex = 0.8) )
+
+```
+
+```{r}
+# Division Winners
+Cols <- ifelse(payroll$DivWin=='1', "red", gray(.7, alpha=0.5))
+with(payroll, {
+  plot(payrollStd ~ jitter(yearID, 0.5), 
+       ylab = "Payroll (inflation-adjusted $ millions)",
+       ylim = c(15,250), log = "y",
+       xlab = "Year",
+       main = "Payroll of MLB Teams (Division Winners in Red)",
+       pch = 19, cex = 0.8, col = Cols)
+})
+```
+
+```{r}
+wswinners <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(WSWin == "1") %>% 
+  mutate(teamID = droplevels(teamID))
+
+mean(wswinners$payroll)
+
+leaguewinners <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(LgWin == "1") %>% 
+  mutate(teamID = droplevels(teamID))
+
+divwinners <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(DivWin == "1") %>% 
+  mutate(teamID = droplevels(teamID))
+
+nondivwinners <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(DivWin == "0") %>% 
+  mutate(teamID = droplevels(teamID))
+
+mean(divwinners$payroll)
+mean(nondivwinners$payroll)
+
+median(divwinners$payroll)
+median(nondivwinners$payroll)
+
+```
+
+```{r}
+# scatterplot of ws winners vs payroll by year
+colswswin <- ifelse(leaguewinners$WSWin=='1', "red", gray(.7, alpha=0.5))
+with(leaguewinners, {
+  plot(payrollStd ~ jitter(yearID, 0.5), 
+       ylab = "Payroll (inflation-adjusted $ millions)",
+       ylim = c(15,250), log = "y",
+       xlab = "Year",
+       main = "Payroll of World Series Contenders (Winners in Red)",
+       pch = 19, cex = 0.8, col = colswswin)
+})
+with(payroll[payroll$WSWin == '1',],
+     text(y = payrollStd, x = yearID, labels = teamID, pos = 2, cex = 0.8) )
+
+# 8 of last 10 WS winners had higher payroll
+
+spendingmodel <- lm(payroll$DivWin ~ payroll$payroll)
+summary(spendingmodel)
+
+```
+
+```{r}
+# simple linear regression of wins by standardized payroll
+winsmodel <- lm(payroll$W ~ payroll$payrollStd)
+summary(winsmodel)
+
+```
+
+```{r}
+# by year wins vs payroll
+par(mfrow=c(2,5))
+yr2010 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2010") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2010$payrollStd, yr2010$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2010")
+# reg<-lm(W ~ payrollStd, data = yr2010)
+# abline(reg)
+
+cor(yr2010$payrollStd, yr2010$W)
+
+yr2011 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2011") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2011$payrollStd, yr2011$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2011")
+# abline(lm(yr2011$W ~ yr2011$payrollStd))
+cor(yr2011$payrollStd, yr2011$W)
+
+yr2012 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2012") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2012$payrollStd, yr2012$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2012")
+# abline(lm(yr2012$W ~ yr2012$payrollStd))
+
+cor(yr2012$payrollStd, yr2012$W)
+
+yr2013 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2013") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2013$payrollStd, yr2013$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2013")
+# abline(lm(yr2013$W ~ yr2013$payrollStd))
+
+cor(yr2013$payrollStd, yr2013$W)
+
+yr2014 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2014") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2014$payrollStd, yr2014$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2014")
+# abline(lm(yr2014$W ~ yr2014$payrollStd))
+
+cor(yr2014$payrollStd, yr2014$W)
+
+
+yr2015 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2015") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2015$payrollStd, yr2015$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2015")
+# abline(lm(yr2015$W ~ yr2015$payrollStd))
+cor(yr2015$payrollStd, yr2015$W)
+
+yr2016 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2016") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2016$payrollStd, yr2016$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2016")
+# abline(lm(yr2016$W ~ yr2016$payrollStd))
+cor(yr2016$payrollStd, yr2016$W)
+
+yr2017 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2017") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2017$payrollStd, yr2017$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2017")
+# abline(lm(yr2017$W ~ yr2017$payrollStd))
+
+cor(yr2017$payrollStd, yr2017$W)
+
+yr2018 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2018") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2018$payrollStd, yr2018$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2018")
+# abline(lm(yr2018$W ~ yr2018$payrollStd))
+
+cor(yr2018$payrollStd, yr2018$W)
+
+yr2019 <- payroll %>% 
+  select(yearID, teamID, payroll, name, Rank, WSWin, LgWin, DivWin, W, L, payrollStd) %>%
+  filter(yearID == "2019") %>% 
+  mutate(teamID = droplevels(teamID))
+plot(yr2019$payrollStd, yr2019$W, xlab = "Standardized Payroll (in Millions)", ylab = "Wins", main = "2019")
+# abline(lm(yr2019$W ~ yr2019$payrollStd))
+
+cor(yr2019$payrollStd, yr2019$W)
+
+# correlation between wins and payroll by year
+totcor <- c(.3688694, 0.4092029, .1900567, 0.2995794, 0.3224326, 0.2387835, 0.6362879, 0.3532706, 0.3773921,  0.4576)
+mean(totcor)
+
+
+```
+
+```{r}
+# Aggregating total wins/payroll for 2010's
+totalwins <- aggregate(payroll$W, by=list(teamID=payroll$teamID), FUN=sum)
+totalspent <- aggregate(payroll$payroll, by=list(teamID=payroll$teamID), FUN=sum)
+arrange(totalwins, desc(x))
+par(mfrow = c(1,1))
+
+
+
+yr2010to19 <- payroll$teamID[1:30]
+yr2010to19 <- cbind(yr2010to19, totalwins, totalspent)
+yr2010to19 <- yr2010to19[, c(2:3, 5)]
+names(yr2010to19)[2] <- "TotalWins"
+names(yr2010to19)[3] <- "TotalPayroll"
+plot(yr2010to19$TotalPayroll, yr2010to19$TotalWins)
+abline(lm(yr2010to19$TotalWins ~ yr2010to19$TotalPayroll))
+cor(yr2010to19$TotalPayroll, yr2010to19$TotalWins)
+summary(lm(yr2010to19$TotalWins ~ yr2010to19$TotalPayroll))
+```
+
+
+```{r}
+# Best spending teams by $/win
+bestspending <- payroll %>%
+  group_by(teamID) %>%
+  filter(Rank == "1") %>% 
+  mutate(milperwin = payrollStd/W)
+
+arrange(bestspending, milperwin)
+
+```
